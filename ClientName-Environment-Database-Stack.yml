@@ -1,0 +1,154 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This templete creates RDS instance and its components
+Parameters:
+  NetworkStackName:
+    Description: Name of the Network stack
+    Type: String
+    Default: 'ClientName-POC-Network'
+  EnvironmentName:
+    Default: POC
+    Description: Either Prod, Staging, Demo etc. To be used for tagging resorces.
+    Type: String
+  ClientName:
+    Default: ClientName_POC
+    Description: Short & Single Word name of Client. To be used for tagging resources.
+    Type: String
+  DBSIZE:
+    Default: '20'
+    Description: Short & Single Word name of Client. To be used for tagging resources.
+    Type: String
+  DBNAME:
+    Default: ClientNamePOCoracle1
+    Description: The database name
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric
+      characters.
+  DBINSTANCEIDENTIFIER:
+    Default: ClientNamePOCoracle1
+    Description: The database Instance Identifier name
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: "^[a-zA-Z][a-zA-Z0-9_]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric
+      characters.
+  DBUSER:
+    Description: The database admin account username
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric
+      characters.
+  DBPASSWORD:
+    NoEcho: 'true'
+    Description: The database admin account password
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: must contain only alphanumeric characters.
+  InstanceClass:
+    Description: Instance Class of the Database  instances
+    Type: String
+    Default: db.t3.small
+    AllowedValues:
+    - db.t2.micro
+    - db.t2.small
+    - db.t3.micro
+    - db.t3.small 
+  DBVersion:
+    Description: Engine Version of the Database  instances
+    Type: String
+    Default: '12.2.0.1.ru-2021-04.rur-2021-04.r1'
+    AllowedValues:
+    - 12.2.0.1.ru-2021-01.rur-2021-01.r1
+    - 12.2.0.1.ru-2021-04.rur-2021-04.r1
+    - 12.2.0.1.ru-2021-07.rur-2021-07.r1
+    - 12.1.0.2.v25
+    - 12.1.0.2.v24
+    - 12.1.0.2.v23  
+  MultiAZDatabase:
+    Default: 'false'
+    Description: Create a multi-AZ MySQL Amazon RDS database instance
+    Type: String
+    AllowedValues:
+    - 'true'
+    - 'false'
+    ConstraintDescription: must be either true or false.
+  FamilyParameterGroup:
+    Description: Create a parameter group
+    Type: String
+    Default: 'oracle-se2-12.2'
+    AllowedValues:
+    - oracle-se2-12.1
+    - oracle-se2-12.2
+
+Resources:
+  DB:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName:
+        Ref: DBNAME
+      DBInstanceIdentifier:
+        Ref: DBINSTANCEIDENTIFIER
+      AllocatedStorage:
+        Ref: DBSIZE
+      AllowMajorVersionUpgrade: 'true'
+      DBInstanceClass:
+        Ref: InstanceClass
+      Engine: oracle-se2
+      EngineVersion:
+        Ref: DBVersion
+      DBSubnetGroupName:
+        Ref: DBSubnetGroup
+      MasterUsername:
+        Ref: DBUSER
+      MasterUserPassword:
+        Ref: DBPASSWORD
+      StorageType: gp2
+      MultiAZ:
+        Ref: MultiAZDatabase
+      DBParameterGroupName:
+        Ref: ParameterGroup
+      LicenseModel: 'license-included'
+      StorageEncrypted: 'true'
+      VPCSecurityGroups:
+      - Fn::ImportValue:
+          Fn::Sub: "${NetworkStackName}-DBSecurityGroup"
+      Tags:
+      - Key: Name
+        Value:
+          Fn::Join:
+          - "-"
+          - - Ref: ClientName
+            - Ref: EnvironmentName
+            - DB
+      - Key: Environment
+        Value:
+          Ref: EnvironmentName
+      - Key: CreatedBy
+        Value: Department
+      - Key: Infra_Managed_By
+        Value: Department
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: WebServer DB subnet group
+      SubnetIds:
+      - Fn::ImportValue:
+          Fn::Sub: "${NetworkStackName}-DBSubnetA"
+      - Fn::ImportValue:
+          Fn::Sub: "${NetworkStackName}-DBSubnetB"
+      - Fn::ImportValue:
+          Fn::Sub: "${NetworkStackName}-DBSubnetC"
+  ParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: CloudFormation Sample Parameter Group
+      Family:
+        Ref: FamilyParameterGroup
